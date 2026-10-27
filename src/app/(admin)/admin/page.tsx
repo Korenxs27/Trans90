@@ -16,7 +16,9 @@ export default async function AdminDashboardPage() {
 
   try { sewaTotal = await db.vehicle.count({ where: { type: "SEWA" as any } }); } catch (e) {}
   try { sewaReady = await db.vehicle.count({ where: { type: "SEWA" as any, status: "READY" as any } }); } catch (e) {}
-  try { sewaRented = await db.vehicle.count({ where: { type: "SEWA" as any, status: { in: ["TERSEWA", "RENTED"] as any } } }); } catch (e) {}
+
+  // ✅ FIX: Hapus "RENTED", gunakan enum resmi "TERSEWA"
+  try { sewaRented = await db.vehicle.count({ where: { type: "SEWA" as any, status: "TERSEWA" as any } }); } catch (e) {}
 
   try { jualTotal = await db.vehicle.count({ where: { type: "JUAL_BELI" as any } }); } catch (e) {}
   try { jualSold = await db.vehicle.count({ where: { type: "JUAL_BELI" as any, status: "SOLD" as any } }); } catch (e) {}

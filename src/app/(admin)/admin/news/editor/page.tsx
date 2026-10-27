@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -30,7 +30,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-export default function NewsEditorPage() {
+// Sub-komponen yang menangani logika dan penggunaan useSearchParams()
+function NewsEditorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("id");
@@ -76,7 +77,8 @@ export default function NewsEditorPage() {
       }),
       ImageExtension.configure({
         HTMLAttributes: {
-          class: "rounded-xl max-w-full h-auto my-4 border border-slate-200 shadow-sm",
+          class:
+            "rounded-xl max-w-full h-auto my-4 border border-slate-200 shadow-sm",
         },
       }),
       LinkExtension.configure({
@@ -90,7 +92,6 @@ export default function NewsEditorPage() {
     content: "<p>Mulai tulis artikel berita atau pengumuman kamu di sini...</p>",
     editorProps: {
       attributes: {
-        // Styling CSS bawaan untuk memperjelas perbedaan ukuran font H1, H2, H3
         class:
           "focus:outline-none min-h-[450px] p-2 text-slate-800 text-sm leading-relaxed [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:my-4 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:my-3 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:my-2 [&_p]:my-2",
       },
@@ -109,30 +110,30 @@ export default function NewsEditorPage() {
 
   // Fetch Data Mode Edit Real-time dari DB
   useEffect(() => {
-  if (editId) {
-    fetch(`/api/news/${editId}`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Gagal mengambil data");
-        return res.json();
-      })
-      .then((data) => {
-        if (data) {
-          setTitle(data.title || "");
-          setSlug(data.slug || "");
-          setLabels(Array.isArray(data.labels) ? data.labels.join(", ") : "");
-          setCategory(data.category || "Berita");
-          setStatus(data.status || "PUBLISHED");
-          if (data.publishedAt) {
-            setPublishedAt(new Date(data.publishedAt).toISOString().slice(0, 16));
+    if (editId) {
+      fetch(`/api/news/${editId}`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Gagal mengambil data");
+          return res.json();
+        })
+        .then((data) => {
+          if (data) {
+            setTitle(data.title || "");
+            setSlug(data.slug || "");
+            setLabels(Array.isArray(data.labels) ? data.labels.join(", ") : "");
+            setCategory(data.category || "Berita");
+            setStatus(data.status || "PUBLISHED");
+            if (data.publishedAt) {
+              setPublishedAt(new Date(data.publishedAt).toISOString().slice(0, 16));
+            }
+            if (editor && data.content) {
+              editor.commands.setContent(data.content);
+            }
           }
-          if (editor && data.content) {
-            editor.commands.setContent(data.content);
-          }
-        }
-      })
-      .catch((err) => toast.error("Gagal memuat data artikel"));
-  }
-}, [editId, editor]);
+        })
+        .catch(() => toast.error("Gagal memuat data artikel"));
+    }
+  }, [editId, editor]);
 
   // Open Link Modal
   const openLinkModal = () => {
@@ -634,5 +635,14 @@ export default function NewsEditorPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Export Default dengan pembungkus Suspense
+export default function NewsEditorPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-sm font-semibold text-slate-500">Memuat Editor Berita...</div>}>
+      <NewsEditorContent />
+    </Suspense>
   );
 }

@@ -1,13 +1,25 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { createToken } from "@/lib/auth";
-import bcrypt from "bcryptjs"; // <-- 1. Import bcryptjs
+import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+// Paksa route ini agar diproses dinamis (mencegah error build prerender Vercel)
+export const dynamic = "force-dynamic";
+
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+const prisma = globalForPrisma.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
+
+    if (!email || !password) {
+      return NextResponse.json(
+        { message: "Email dan password wajib diisi!" },
+        { status: 400 }
+      );
+    }
 
     const user = await prisma.user.findUnique({
       where: { email },
@@ -20,7 +32,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. Verifikasi Password dengan bcrypt.compare
+    // Verifikasi Password Hash dengan bcrypt.compare
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
@@ -30,7 +42,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Buat JWT Token
+    // Buat JWT Token
     const token = await createToken({
       id: user.id,
       email: user.email,
@@ -53,6 +65,7 @@ export async function POST(req: Request) {
 
     return response;
   } catch (error) {
+    console.error("Login API Error:", error);
     return NextResponse.json(
       { message: "Server error!" },
       { status: 500 }
