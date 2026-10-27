@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 // 1. GET SINGLE NEWS BY ID
 export async function GET(
   req: Request,

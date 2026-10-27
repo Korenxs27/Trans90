@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+// WAJIB: Paksa route ini agar diproses dinamis (mencegah error build prerender Vercel)
+export const dynamic = "force-dynamic";
+
 // 1. GET CONFIG BERANDA
 export async function GET() {
   try {
