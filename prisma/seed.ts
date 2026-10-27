@@ -1,22 +1,35 @@
+import "dotenv/config"; // <-- WAJIB: Supaya pasti baca .env lokal kamu!
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("Memulai seeding data awal...");
 
-  // 1. Seed User Super Admin
+  const adminEmail = process.env.ADMIN_EMAIL || "trans90@gmail.com";
+  const rawPassword = process.env.ADMIN_PASSWORD || "Trans902026";
+
+  // Hash Password
+  const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+  // Upsert Super Admin (Update password jika email sudah ada)
   const admin = await prisma.user.upsert({
-    where: { email: "admin@autocorp.id" },
-    update: {},
+    where: { 
+      email: adminEmail 
+    },
+    update: {
+      password: hashedPassword,
+    },
     create: {
-      name: "Admin",
-      email: "admin@autocorp.id",
-      password: "adminpassword123", // Jangan lupa hashing bcrypt di production
-      role: "Admin" as any,
+      email: adminEmail,
+      password: hashedPassword,
+      role: "ADMIN",
+      name: "Admin Trans 90",
     },
   });
-  console.log(`Admin dibuat: ${admin.email}`);
+
+  console.log("User Super Admin berhasil di-seed/update:", admin.email);
 
   // 2. Seed Chart of Accounts (COA) Akuntansi
   const coaData = [
@@ -44,9 +57,8 @@ async function main() {
       },
     });
   }
-  console.log("Chart of Accounts (COA) berhasil di-seed!");
 
-  // 3. Seed Data Kendaraan Contoh (Sewa & Jual Beli)
+  // 3. Seed Data Kendaraan Contoh
   const vehicleData = [
     {
       title: "Toyota Innova Zenix 2.0 HV 2023",
@@ -64,26 +76,7 @@ async function main() {
       plateNumber: "B 1234 ABC",
       price: 850000,
       priceUnit: "/hari",
-      description: "Unit nyaman, sangat irit bahan bakar, cocok untuk keluarga dan perjalanan operasional.",
-    },
-    {
-      title: "Honda HR-V 1.5 SE CVT 2022",
-      slug: "honda-hrv-se-2022",
-      type: "JUAL_BELI" as any,
-      category: "MOBIL" as any,
-      subCategory: "SUV Compact",
-      image: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d",
-      images: ["https://images.unsplash.com/photo-1552519507-da3b142c6e3d"],
-      status: "READY" as any,
-      transmission: "Automatic",
-      fuel: "Bensin",
-      seats: 5,
-      mileage: "24.000 KM",
-      year: "2022",
-      plateNumber: "B 5678 XYZ",
-      price: 345000000,
-      priceUnit: null,
-      description: "Kondisiistimewa, servis rutin bengkel resmi, bebas dari kecelakaan dan banjir.",
+      description: "Unit nyaman, irit bahan bakar, cocok untuk operasional.",
     },
   ];
 
@@ -95,7 +88,6 @@ async function main() {
     });
   }
 
-  console.log("Kendaraan contoh berhasil ditambahkan!");
   console.log("Seeding selesai dengan sukses!");
 }
 

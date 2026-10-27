@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { createToken } from "@/lib/auth";
+import bcrypt from "bcryptjs"; // <-- 1. Import bcryptjs
 
 const prisma = new PrismaClient();
 
@@ -12,14 +13,24 @@ export async function POST(req: Request) {
       where: { email },
     });
 
-    if (!user || user.password !== password) {
+    if (!user) {
       return NextResponse.json(
         { message: "Email atau password salah!" },
         { status: 401 }
       );
     }
 
-    // Buat JWT Token
+    // 2. Verifikasi Password dengan bcrypt.compare
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { message: "Email atau password salah!" },
+        { status: 401 }
+      );
+    }
+
+    // 3. Buat JWT Token
     const token = await createToken({
       id: user.id,
       email: user.email,
