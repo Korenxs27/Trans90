@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==========================================
+// 1. ENUMS
+// ==========================================
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  FINANCE
+  SALES
+}
+
+enum VehicleType {
+  SEWA
+  JUAL_BELI
+}
+
+enum VehicleCategory {
+  MOBIL
+  MOTOR
+}
+
+enum VehicleStatus {
+  READY
+  TERSEWA
+  SOLD
+  MAINTENANCE
+}
+
+enum OrderStatus {
+  PENDING
+  VERIFIED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+// ==========================================
+// 2. USER & AUTHENTICATION
+// ==========================================
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(ADMIN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+// ==========================================
+// 3. VEHICLE MANAGEMENT (BISNIS)
+// ==========================================
+
+model Vehicle {
+  id          String          @id @default(cuid())
+  title       String
+  slug        String          @unique
+  type        VehicleType     // SEWA / JUAL_BELI
+  category    VehicleCategory // MOBIL / MOTOR
+  subCategory String?         // SUV, MPV, Matic, dll.
+  image       String          // URL Utama Gambar Unit
+  images      String[]        // Galeri Gambar Tambahan
+  status      VehicleStatus   @default(READY)
+
+  // Spesifikasi Unit
+  transmission String? // Automatic / Manual
+  fuel         String? // Bensin / Diesel / Hybrid / EV
+  seats        Int?    // Khusus Mobil
+  mileage      String? // Khusus Jual Beli (misal: "35.000 KM")
+  year         String? // Tahun Pembuatan
+  plateNumber  String? // Plat Nomor (Private Admin Only)
+
+  // Harga
+  price     Decimal @db.Decimal(15, 2)
+  priceUnit String? // "/hari", "/bulan", atau null untuk jual beli
+
+  description String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rentalOrders    RentalOrder[]
+  vehicleExpenses VehicleExpense[]
+
+  @@map("vehicles")
+}
+
+// ==========================================
+// 4. OPERATIONAL: RENTAL ORDERS
+// ==========================================
+
+model RentalOrder {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique // Contoh: ORD-202610-001
+  vehicleId   String
+  vehicle     Vehicle     @relation(fields: [vehicleId], references: [id])
+  status      OrderStatus @default(PENDING)
+
+  // Data Pemesan
+  fullName String
+  phone    String
+  email    String
+  notes    String? @db.Text
+
+  // Detail Sewa
+  location   String
+  startDate  DateTime
+  endDate    DateTime
+  totalDays  Int
+  withDriver Boolean  @default(false)
+
+  // Rincian Biaya
+  unitPrice   Decimal @db.Decimal(15, 2)
+  driverFee   Decimal @default(0) @db.Decimal(15, 2)
+  totalAmount Decimal @db.Decimal(15, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("rental_orders")
+}
+
+// ==========================================
+// 5. AKUNTANSI DOUBLE-ENTRY
+// ==========================================
+
+model ChartOfAccount {
+  id          String      @id @default(cuid())
+  code        String      @unique // Kode Akun, misal: "101.01", "401.00"
+  name        String      // Nama Akun, misal: "Kas Utama", "Pendapatan Sewa"
+  type        AccountType // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+  isHeader    Boolean     @default(false)
+  parentCode  String?
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  journalLines JournalLine[]
+
+  @@map("chart_of_accounts")
+}
+
+model JournalEntry {
+  id          String   @id @default(cuid())
+  entryNumber String   @unique // Contoh: JRN-202610-001
+  date        DateTime @default(now())
+  refNumber   String?  // Nomor referensi (misal: orderNumber)
+  description String   @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lines JournalLine[]
+
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id             String         @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        ChartOfAccount @relation(fields: [accountId], references: [id])
+
+  debit  Decimal @default(0) @db.Decimal(15, 2)
+  credit Decimal @default(0) @db.Decimal(15, 2)
+
+  @@map("journal_lines")
+}
+
+model VehicleExpense {
+  id        String   @id @default(cuid())
+  vehicleId String
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id])
+  title     String   // Misal: "Servis Berkala 40.000 KM"
+  amount    Decimal  @db.Decimal(15, 2)
+  date      DateTime @default(now())
+  notes     String?  @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@map("vehicle_expenses")
+}
+
+// ==========================================
+// 6. CMS HALAMAN PUBLIK & MEDIA LIBRARY
+// ==========================================
+
+// Menampung konten terpisah halaman (beranda, tentang-kami, gcg, investor-relations, esg)
+model PageContent {
+  id        String   @id @default(cuid())
+  pageKey   String   @unique // "beranda", "tentang-kami", "gcg", "investor-relations", "esg"
+  title     String
+  sections  Json     // JSON fleksibel untuk section masing-masing halaman
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("page_contents")
+}
+
+// Media Library Management
+model Media {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String
+  mimeType  String
+  size      Int
+  createdAt DateTime @default(now())
+
+  @@map("media_library")
+}
+
+// Modul Ruang Berita / CMS Artikel
+model News {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  content     String
+  category    String   @default("Berita")
+  labels      String[]
+  image       String?
+  status      String   @default("PUBLISHED")
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("news")
+}
+
+// Audit Logs
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  details   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
