@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Trash2, AlertTriangle, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import imageCompression from "browser-image-compression";
 
 export default function EditVehicleForm({ vehicle }: { vehicle: any }) {
   const router = useRouter();
@@ -57,15 +58,38 @@ export default function EditVehicleForm({ vehicle }: { vehicle: any }) {
   };
 
   // Upload Multi-Foto Handler
+  // Upload Multi-Foto Handler dengan Auto-Compress
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setUploading(true);
     const formData = new FormData();
-    Array.from(files).forEach((file) => formData.append("files", file));
+
+    // Konfigurasi kompresi (Maks 500 KB per foto)
+    const compressionOptions = {
+      maxSizeMB: 0.5,          // Batas maksimal 500 KB
+      maxWidthOrHeight: 1200,   // Dimensi maksimal (tetap jernih di layar)
+      useWebWorker: true,
+    };
 
     try {
+      // Loop dan kompres setiap foto otomatis sebelum dikirim
+      for (const file of Array.from(files)) {
+        let fileToUpload = file;
+
+        if (file.type.startsWith("image/")) {
+          try {
+            const compressed = await imageCompression(file, compressionOptions);
+            fileToUpload = new File([compressed], file.name, { type: file.type });
+          } catch (compressErr) {
+            console.warn("Gagal mengompres 1 gambar, menggunakan file asli:", compressErr);
+          }
+        }
+
+        formData.append("files", fileToUpload);
+      }
+
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,
@@ -75,7 +99,7 @@ export default function EditVehicleForm({ vehicle }: { vehicle: any }) {
       if (!res.ok) throw new Error(data.message || "Gagal mengunggah foto");
 
       setImages((prev) => [...prev, ...data.urls]);
-      toast.success(`${data.urls.length} foto berhasil ditambahkan!`);
+      toast.success(`${data.urls.length} foto berhasil ditambahkan & di-compress!`);
     } catch (err: any) {
       toast.error(err.message || "Gagal mengunggah foto");
     } finally {

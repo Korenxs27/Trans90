@@ -1,28 +1,103 @@
-import CoaReportsClient from "./CoaReportsClient";
+import { PrismaClient, AccountType } from "@prisma/client";
+import COAReportClient from "./CoaReportsClient";
 
-export default async function AdminCoaPage() {
-  // Master Data Akun COA Lengkap UKM
-  const accounts = [
-    { code: "1001", name: "Kas Utama AutoCorp", category: "Aset Lancar", balance: 145000000, type: "DEBIT" },
-    { code: "1002", name: "Bank BCA Operasional", category: "Aset Lancar", balance: 320000000, type: "DEBIT" },
-    { code: "1201", name: "Aset Armada Sewa (Kendaraan)", category: "Aset Tetap", balance: 850000000, type: "DEBIT" },
-    { code: "1301", name: "Stok Inventaris Jual Beli", category: "Aset Tetap", balance: 420000000, type: "DEBIT" },
-    { code: "2001", name: "Hutang Perawatan Armada", category: "Kewajiban", balance: 15000000, type: "KREDIT" },
-    { code: "3001", name: "Modal Pemilik", category: "Ekuitas", balance: 1000000000, type: "KREDIT" },
-    { code: "4001", name: "Pendapatan Sewa Armada", category: "Pendapatan", balance: 48500000, type: "KREDIT" },
-    { code: "4002", name: "Pendapatan Penjualan Unit", category: "Pendapatan", balance: 185000000, type: "KREDIT" },
-    { code: "5001", name: "Beban Perawatan & Servis", category: "Beban Operasional", balance: 12400000, type: "DEBIT" },
-  ];
+const prisma = new PrismaClient();
 
-  // Data Grafik Bulanan
-  const chartData = [
-    { month: "Mei", pendapatan: 35000000, beban: 8000000 },
-    { month: "Jun", pendapatan: 42000000, beban: 9500000 },
-    { month: "Jul", pendapatan: 50000000, beban: 11000000 },
-    { month: "Agu", pendapatan: 48000000, beban: 10000000 },
-    { month: "Sep", pendapatan: 55000000, beban: 12000000 },
-    { month: "Okt", pendapatan: 68500000, beban: 12400000 },
-  ];
+export const dynamic = "force-dynamic";
 
-  return <CoaReportsClient accounts={accounts} chartData={chartData} />;
+export interface COAAccountWithBalance {
+  id: string;
+  code: string;
+  name: string;
+  type: AccountType;
+  isHeader: boolean;
+  parentCode: string | null;
+  description: string | null;
+  debitTotal: number;
+  creditTotal: number;
+  netBalance: number;
+  journalCount: number;
+}
+
+export default async function COAPage() {
+  // 1. Ambil seluruh data ChartOfAccount beserta baris Jurnal terkait
+  const accounts = await prisma.chartOfAccount.findMany({
+    orderBy: { code: "asc" },
+    include: {
+      journalLines: {
+        select: {
+          debit: true,
+          credit: true,
+        },
+      },
+      _count: {
+        select: { journalLines: true },
+      },
+    },
+  });
+
+  // 2. Hitung Saldo Real-Time per Akun dari JournalLines
+  const processedAccounts: COAAccountWithBalance[] = accounts.map((acc) => {
+    const debitTotal = acc.journalLines.reduce((sum, item) => sum + Number(item.debit || 0), 0);
+    const creditTotal = acc.journalLines.reduce((sum, item) => sum + Number(item.credit || 0), 0);
+
+    // Aturan Saldo Normal:
+    // ASSET & EXPENSE => Debit - Kredit
+    // LIABILITY, EQUITY, REVENUE => Kredit - Debit
+    const isDebitNormal = acc.type === "ASSET" || acc.type === "EXPENSE";
+    const netBalance = isDebitNormal ? debitTotal - creditTotal : creditTotal - debitTotal;
+
+    return {
+      id: acc.id,
+      code: acc.code,
+      name: acc.name,
+      type: acc.type,
+      isHeader: acc.isHeader,
+      parentCode: acc.parentCode,
+      description: acc.description,
+      debitTotal,
+      creditTotal,
+      netBalance,
+      journalCount: acc._count.journalLines,
+    };
+  });
+
+  // 3. Agregasi Kontrol Silang (Persamaan Akuntansi Aset = Liabilitas + Ekuitas + Laba Berjalan)
+  const totalAssets = processedAccounts
+    .filter((a) => a.type === "ASSET" && !a.isHeader)
+    .reduce((sum, a) => sum + a.netBalance, 0);
+
+  const totalLiabilities = processedAccounts
+    .filter((a) => a.type === "LIABILITY" && !a.isHeader)
+    .reduce((sum, a) => sum + a.netBalance, 0);
+
+  const totalEquity = processedAccounts
+    .filter((a) => a.type === "EQUITY" && !a.isHeader)
+    .reduce((sum, a) => sum + a.netBalance, 0);
+
+  const totalRevenue = processedAccounts
+    .filter((a) => a.type === "REVENUE" && !a.isHeader)
+    .reduce((sum, a) => sum + a.netBalance, 0);
+
+  const totalExpense = processedAccounts
+    .filter((a) => a.type === "EXPENSE" && !a.isHeader)
+    .reduce((sum, a) => sum + a.netBalance, 0);
+
+  const netIncome = totalRevenue - totalExpense;
+  const isBalanced = Math.abs(totalAssets - (totalLiabilities + totalEquity + netIncome)) < 0.01;
+
+  return (
+    <COAReportClient
+      initialAccounts={processedAccounts}
+      summaryStats={{
+        totalAssets,
+        totalLiabilities,
+        totalEquity,
+        totalRevenue,
+        totalExpense,
+        netIncome,
+        isBalanced,
+      }}
+    />
+  );
 }

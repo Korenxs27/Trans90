@@ -17,6 +17,7 @@ enum Role {
   ADMIN
   FINANCE
   SALES
+  USER        // Customer / User Publik
 }
 
 enum VehicleType {
@@ -52,22 +53,68 @@ enum AccountType {
   EXPENSE
 }
 
+enum InquiryType {
+  RENT_EMAIL
+  BUY_WHATSAPP
+}
+
+enum InquiryStatus {
+  PENDING
+  CONTACTED
+  CLOSED
+}
+
 // ==========================================
-// 2. USER & AUTHENTICATION
+// 2. USER, AUTHENTICATION & CUSTOMER DASHBOARD
 // ==========================================
 
 model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
-  password  String
-  role      Role     @default(ADMIN)
+  password  String?  // Optional untuk Google OAuth
+  phone     String?  // Nomor HP / WhatsApp User
+  role      Role     @default(USER)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  auditLogs AuditLog[]
+  auditLogs     AuditLog[]
+  savedVehicles SavedVehicle[]
+  inquiries     Inquiry[]
 
   @@map("users")
+}
+
+// Bookmark / Wishlist User
+model SavedVehicle {
+  id        String   @id @default(cuid())
+  userId    String
+  vehicleId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vehicleId])
+  @@map("saved_vehicles")
+}
+
+// Logging Aktivitas User di Dashboard (Sewa via Email / Tanya Beli via WA)
+model Inquiry {
+  id        String        @id @default(cuid())
+  userId    String
+  vehicleId String
+  type      InquiryType   // RENT_EMAIL / BUY_WHATSAPP
+  status    InquiryStatus @default(PENDING)
+  notes     String?       @db.Text
+  startDate DateTime?     // Khusus jika sewa
+  endDate   DateTime?     // Khusus jika sewa
+  createdAt DateTime      @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@map("inquiries")
 }
 
 // ==========================================
@@ -104,6 +151,8 @@ model Vehicle {
 
   rentalOrders    RentalOrder[]
   vehicleExpenses VehicleExpense[]
+  savedBy         SavedVehicle[]
+  inquiries       Inquiry[]
 
   @@map("vehicles")
 }
@@ -210,7 +259,6 @@ model VehicleExpense {
 // 6. CMS HALAMAN PUBLIK & MEDIA LIBRARY
 // ==========================================
 
-// Menampung konten terpisah halaman (beranda, tentang-kami, gcg, investor-relations, esg)
 model PageContent {
   id        String   @id @default(cuid())
   pageKey   String   @unique // "beranda", "tentang-kami", "gcg", "investor-relations", "esg"
@@ -222,7 +270,6 @@ model PageContent {
   @@map("page_contents")
 }
 
-// Media Library Management
 model Media {
   id        String   @id @default(cuid())
   filename  String
@@ -234,7 +281,6 @@ model Media {
   @@map("media_library")
 }
 
-// Modul Ruang Berita / CMS Artikel
 model News {
   id          String   @id @default(cuid())
   title       String
@@ -251,7 +297,6 @@ model News {
   @@map("news")
 }
 
-// Audit Logs
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String

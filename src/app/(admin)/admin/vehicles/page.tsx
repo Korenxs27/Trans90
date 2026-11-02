@@ -4,6 +4,8 @@ import { Plus, Search, Filter } from "lucide-react";
 import { db } from "@/lib/db";
 import { formatRupiah } from "@/lib/utils";
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminVehiclesPage() {
   const vehicles = await db.vehicle.findMany({
     orderBy: { createdAt: "desc" },

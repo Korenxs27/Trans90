@@ -1,7 +1,7 @@
 import "@/app/globals.css"; // Import CSS global kamu
 
 export const metadata = {
-  title: "AutoCorp - Rental & Jual Beli Kendaraan",
+  title: "TRANS90 - Sewa & Jual Beli Kendaraan",
   description: "Layanan sewa & jual beli mobil dan motor terpercaya",
 };
 
