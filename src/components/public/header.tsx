@@ -351,11 +351,11 @@ export default function Header() {
               JUAL BELI
             </Link>
             <Link
-              href="/admin/login"
+              href="/login"
               onClick={() => setIsMobileMenuOpen(false)}
               className="col-span-2 flex items-center justify-center py-2.5 text-xs font-bold text-slate-900 bg-amber-400 rounded-lg shadow-sm active:bg-amber-300 transition-colors"
             >
-              MASUK / AKUN ADMIN
+              MASUK
             </Link>
           </div>
 

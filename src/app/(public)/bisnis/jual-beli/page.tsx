@@ -35,19 +35,12 @@ export default async function KatalogJualBeliPage({ searchParams }: PageProps) {
       {/* HEADER SECTION */}
       <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <span className="text-xs font-bold text-[#1F9D55] uppercase tracking-wider">
-            Katalog Jual Beli
-          </span>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B2A5B] mt-1">
             Kendaraan Dijual Siap Pakai
           </h1>
-          {q ? (
+          {q && (
             <p className="text-xs text-slate-500 mt-1">
               Menampilkan hasil pencarian untuk: <span className="font-bold text-[#1E4FA3]">"{q}"</span>
-            </p>
-          ) : (
-            <p className="text-xs sm:text-sm text-[#586678] mt-1">
-              Pilihan mobil & motor bekas terawat dengan kelengkapan surat terjamin.
             </p>
           )}
         </div>
