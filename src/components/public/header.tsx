@@ -151,7 +151,7 @@ export default function Header() {
             </Link>
 
             <Link
-              href="/admin/login"
+              href="/login"
               className="px-4 py-1.5 text-xs font-bold text-slate-900 bg-amber-400 rounded-lg hover:bg-amber-300 transition-colors shadow-md"
             >
               MASUK
